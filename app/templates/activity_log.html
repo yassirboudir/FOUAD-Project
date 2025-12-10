@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h3 class="mb-0"><i class="fas fa-history"></i> Activity Log</h3>
+        <a href="{{ url_for('admin') }}" class="btn btn-outline-light btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Admin
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if activities.items %}
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Target</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for activity in activities.items %}
+                    <tr>
+                        <td>
+                            <small>{{ activity.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+                        </td>
+                        <td>
+                            {% if activity.user %}
+                            <span class="badge badge-primary">{{ activity.user.username }}</span>
+                            {% else %}
+                            <span class="badge badge-secondary">System</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if activity.action == 'created' %}
+                            <span class="badge badge-success"><i class="fas fa-plus"></i> Created</span>
+                            {% elif activity.action == 'updated' %}
+                            <span class="badge badge-info"><i class="fas fa-edit"></i> Updated</span>
+                            {% elif activity.action == 'deleted' %}
+                            <span class="badge badge-danger"><i class="fas fa-trash"></i> Deleted</span>
+                            {% elif activity.action == 'commented' %}
+                            <span class="badge badge-warning"><i class="fas fa-comment"></i> Commented</span>
+                            {% elif activity.action == 'status_changed' %}
+                            <span class="badge badge-secondary"><i class="fas fa-exchange-alt"></i> Status
+                                Changed</span>
+                            {% elif activity.action == 'password_reset' %}
+                            <span class="badge badge-warning"><i class="fas fa-key"></i> Password Reset</span>
+                            {% else %}
+                            <span class="badge badge-secondary">{{ activity.action }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="text-muted">{{ activity.target_type }}</span>
+                            {% if activity.target_id %}
+                            <span class="badge badge-light">#{{ activity.target_id }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">{{ activity.details[:80] if activity.details else '-' }}{% if
+                                activity.details and activity.details|length > 80 %}...{% endif %}</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <nav aria-label="Page navigation" class="p-3">
+            <ul class="pagination justify-content-center mb-0">
+                {% for page_num in activities.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                {% if page_num %}
+                {% if activities.page == page_num %}
+                <li class="page-item active">
+                    <a class="page-link" href="{{ url_for('activity_log', page=page_num) }}">{{ page_num }}</a>
+                </li>
+                {% else %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('activity_log', page=page_num) }}">{{ page_num }}</a>
+                </li>
+                {% endif %}
+                {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">…</span>
+                </li>
+                {% endif %}
+                {% endfor %}
+            </ul>
+        </nav>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-clipboard-list fa-4x text-muted mb-3"></i>
+            <p class="text-muted">No activity recorded yet.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock content %}

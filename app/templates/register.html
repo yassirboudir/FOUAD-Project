@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-dark text-white text-center py-4">
+                    <h3 class="mb-0"><i class="fas fa-user-plus"></i> Create Account</h3>
+                    <p class="mb-0 text-light">Join Waste Walk today</p>
+                </div>
+                <div class="card-body p-5">
+                    <form method="POST" action="">
+                        {{ form.hidden_tag() }}
+                        <div class="form-group mb-4">
+                            {{ form.username.label(class="form-control-label font-weight-bold text-dark") }}
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-light"><i class="fas fa-user"></i></span>
+                                </div>
+                                {{ form.username(class="form-control form-control-lg py-3" + (" is-invalid" if form.username.errors else "")) }}
+                            </div>
+                            {% if form.username.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.username.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-group mb-4">
+                            {{ form.password.label(class="form-control-label font-weight-bold text-dark") }}
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-light"><i class="fas fa-lock"></i></span>
+                                </div>
+                                {{ form.password(class="form-control form-control-lg py-3" + (" is-invalid" if form.password.errors else "")) }}
+                            </div>
+                            {% if form.password.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.password.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-group mb-4">
+                            {{ form.confirm_password.label(class="form-control-label font-weight-bold text-dark") }}
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-light"><i class="fas fa-lock"></i></span>
+                                </div>
+                                {{ form.confirm_password(class="form-control form-control-lg py-3" + (" is-invalid" if form.confirm_password.errors else "")) }}
+                            </div>
+                            {% if form.confirm_password.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.confirm_password.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="form-group">
+                            {{ form.submit(class="btn btn-primary btn-block btn-lg py-3", style="background: linear-gradient(to right, #c21807, #000000); border: none;") }}
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light text-center">
+                    <small class="text-muted">
+                        Already Have An Account? <a class="ml-2" href="{{ url_for('login') }}">Sign In</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

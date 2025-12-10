@@ -1,0 +1,8 @@
+Hello,
+
+i am trying to make a pytoh web-based app using flask, the app is called waste walk - action plan, from the name you know what are we doing, its going to be a user app each have a user and a password , each user can publish a post contatning problemes, causes , corrective actions, a photo, the responsable of the action, date of realisation 
+
+
+its a simple app, there will be roles as publisher, a viewer , and admin who can create user and reset their password.
+
+the css design  will be elegant and have three main colors scheme red white and black and it will be professional 

@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <h3 class="mb-0"><i class="fas fa-clipboard-list"></i> Post Details</h3>
+        <span
+            class="badge badge-{{ 'success' if post.status == 'Completed' else 'warning' if post.status == 'In Progress' else 'danger' }} badge-pill px-3 py-2">
+            <i class="fas fa-circle"></i> {{ post.status }}
+        </span>
+    </div>
+    <div class="card-body">
+        <!-- Post Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+            <div class="d-flex align-items-center">
+                <div class="mr-3">
+                    <i class="fas fa-user-circle fa-3x text-muted"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0">{{ post.author.username }}</h5>
+                    <small class="text-muted">
+                        <i class="far fa-calendar-alt"></i> {{ post.date_realization.strftime('%B %d, %Y') }}
+                    </small>
+                </div>
+            </div>
+            <!-- PDF Export Button -->
+            <a href="{{ url_for('export_post_pdf', post_id=post.id) }}" class="btn btn-outline-primary">
+                <i class="fas fa-file-pdf"></i> Export PDF
+            </a>
+        </div>
+
+        <!-- Problem Title -->
+        <h2 class="text-primary mb-4">{{ post.problem }}</h2>
+
+        <!-- Image (Full Size) -->
+        {% if post.image_file != 'default.jpg' %}
+        <div class="text-center mb-4">
+            <a href="{{ url_for('static', filename='uploads/' + post.image_file) }}" target="_blank">
+                <img src="{{ url_for('static', filename='uploads/' + post.image_file) }}"
+                    class="img-fluid rounded shadow" style="max-width: 100%; max-height: 500px; object-fit: contain;"
+                    alt="Post image">
+            </a>
+            <p class="text-muted mt-2"><small><i class="fas fa-search-plus"></i> Click image to view full size</small>
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Details Cards -->
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card h-100 bg-light">
+                    <div class="card-header">
+                        <i class="fas fa-exclamation-triangle text-warning"></i> <strong>Cause</strong>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text mb-0">{{ post.cause }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <div class="card h-100 bg-light">
+                    <div class="card-header">
+                        <i class="fas fa-tools text-primary"></i> <strong>Corrective Action</strong>
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text mb-0">{{ post.corrective_action }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Responsible Person -->
+        <div class="card bg-light mb-4">
+            <div class="card-body">
+                <i class="fas fa-user-check text-success"></i>
+                <strong>Responsible:</strong> {{ post.responsible }}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+            <a href="{{ url_for('home') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Home
+            </a>
+            {% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.id == post.author.id)
+            %}
+            <div>
+                <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-outline-primary mr-2">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+                <button type="button" class="btn btn-outline-danger" data-toggle="modal" data-target="#deleteModal">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Comments Section -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-comments"></i> Comments ({{ post.comments|length }})</h5>
+    </div>
+    <div class="card-body">
+        {% if current_user.is_authenticated %}
+        <!-- Add Comment Form -->
+        <form method="POST" action="{{ url_for('add_comment', post_id=post.id) }}" class="mb-4">
+            <div class="form-group">
+                <textarea name="content" class="form-control" rows="3" placeholder="Write a comment..."
+                    required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-paper-plane"></i> Post Comment
+            </button>
+        </form>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> <a href="{{ url_for('login') }}">Log in</a> to add comments.
+        </div>
+        {% endif %}
+
+        <!-- Comments List -->
+        {% if post.comments %}
+        <div class="comments-list">
+            {% for comment in post.comments|sort(attribute='date_posted', reverse=True) %}
+            <div class="media mb-3 p-3 bg-light rounded">
+                <i class="fas fa-user-circle fa-2x text-muted mr-3 mt-1"></i>
+                <div class="media-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">
+                                <strong>{{ comment.user.username }}</strong>
+                                <small class="text-muted ml-2">
+                                    <i class="far fa-clock"></i> {{ comment.date_posted.strftime('%Y-%m-%d %H:%M') }}
+                                </small>
+                            </h6>
+                            <p class="mb-0">{{ comment.content }}</p>
+                        </div>
+                        {% if current_user.is_authenticated and (current_user.id == comment.user_id or current_user.role
+                        == 'admin') %}
+                        <form action="{{ url_for('delete_comment', comment_id=comment.id) }}" method="POST"
+                            class="ml-2">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete comment"
+                                onclick="return confirm('Delete this comment?')">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="far fa-comment-dots fa-3x mb-3"></i>
+            <p>No comments yet. Be the first to comment!</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+{% if current_user.is_authenticated and (current_user.role == 'admin' or current_user.id == post.author.id) %}
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Confirm Deletion</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this post?</p>
+                <p class="font-weight-bold">{{ post.problem }}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock content %}

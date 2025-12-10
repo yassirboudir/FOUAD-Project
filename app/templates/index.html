@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="jumbotron"
+    style="background: linear-gradient(135deg, #c21807 0%, #333 100%); color: white; border-radius: 15px; margin-bottom: 30px; padding: 40px 20px;">
+    <h1 class="display-4 text-center">Waste Walk - Action Plan</h1>
+    <p class="lead text-center">Identify, analyze, and resolve waste-related issues with our systematic approach.</p>
+    <div class="text-center mt-3">
+        <a href="{{ url_for('export_all_posts_pdf') }}" class="btn btn-outline-light mr-2">
+            <i class="fas fa-list"></i> Export Summary PDF
+        </a>
+        <a href="{{ url_for('export_all_posts_detailed_pdf') }}" class="btn btn-light text-danger">
+            <i class="fas fa-file-pdf"></i> Export Detailed PDF
+        </a>
+    </div>
+</div>
+
+<!-- Search and Filter Form -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <form method="GET" action="{{ url_for('home') }}">
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        </div>
+                        <input type="text" class="form-control" name="search"
+                            placeholder="Search posts (problem, cause, action, responsible)..." value="{{ search }}">
+                        <div class="input-group-append">
+                            <button class="btn btn-outline-primary" type="submit">Search</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="col-md-6">
+                <form method="GET" action="{{ url_for('home') }}" class="form-inline">
+                    <input type="hidden" name="search" value="{{ search }}">
+                    <div class="input-group w-100">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">Status</span>
+                        </div>
+                        <select name="status" class="form-control" onchange="this.form.submit()">
+                            <option value="all" {% if status_filter=='all' %}selected{% endif %}>All Statuses</option>
+                            <option value="Open" {% if status_filter=='Open' %}selected{% endif %}>Open</option>
+                            <option value="In Progress" {% if status_filter=='In Progress' %}selected{% endif %}>In
+                                Progress</option>
+                            <option value="Completed" {% if status_filter=='Completed' %}selected{% endif %}>Completed
+                            </option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if posts.items %}
+{% for post in posts.items %}
+<article class="card mb-4 shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex align-items-center">
+                <div class="mr-2">
+                    <i class="fas fa-user-circle fa-2x text-muted"></i>
+                </div>
+                <div>
+                    <h6 class="mb-0">{{ post.author.username }}</h6>
+                    <small class="text-muted"><i class="far fa-calendar-alt"></i> {{
+                        post.date_realization.strftime('%Y-%m-%d') }}</small>
+                </div>
+            </div>
+            <span
+                class="badge badge-{{ 'success' if post.status == 'Completed' else 'warning' if post.status == 'In Progress' else 'danger' }} badge-pill px-3 py-2">
+                <i class="fas fa-circle"></i> {{ post.status }}
+            </span>
+        </div>
+
+        <a href="{{ url_for('post_detail', post_id=post.id) }}"
+            class="card-title text-primary h4 d-block text-decoration-none">{{ post.problem }}</a>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card bg-light mb-3">
+                    <div class="card-header">
+                        <i class="fas fa-exclamation-triangle text-warning"></i> Cause
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">{{ post.cause }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-light mb-3">
+                    <div class="card-header">
+                        <i class="fas fa-tools text-primary"></i> Corrective Action
+                    </div>
+                    <div class="card-body">
+                        <p class="card-text">{{ post.corrective_action }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div>
+                <i class="fas fa-user-check text-success"></i> <strong>Responsible:</strong> {{ post.responsible }}
+            </div>
+
+            {% if post.image_file != 'default.jpg' %}
+            <div class="text-center">
+                <a href="{{ url_for('static', filename='uploads/' + post.image_file) }}" target="_blank">
+                    <img src="{{ url_for('static', filename='uploads/' + post.image_file) }}" class="img-thumbnail"
+                        style="max-height: 100px; max-width: 100px; object-fit: cover;" alt="Post image">
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if current_user.role == 'admin' or current_user.id == post.author.id %}
+        <hr>
+        <div class="d-flex justify-content-end">
+            <a href="{{ url_for('edit_post', post_id=post.id) }}" class="btn btn-sm btn-outline-primary mr-2">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-toggle="modal"
+                data-target="#deleteModal{{ post.id }}">
+                <i class="fas fa-trash"></i> Delete
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</article>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal{{ post.id }}" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> Confirm Deletion</h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this post?</p>
+                <p class="font-weight-bold">{{ post.problem }}</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('delete_post', post_id=post.id) }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Pagination -->
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+        {% for page_num in posts.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+        {% if page_num %}
+        {% if posts.page == page_num %}
+        <li class="page-item active">
+            <a class="page-link" href="{{ url_for('home', page=page_num, search=search, status=status_filter) }}">{{
+                page_num }}</a>
+        </li>
+        {% else %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('home', page=page_num, search=search, status=status_filter) }}">{{
+                page_num }}</a>
+        </li>
+        {% endif %}
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">…</span>
+        </li>
+        {% endif %}
+        {% endfor %}
+    </ul>
+</nav>
+{% else %}
+<div class="card text-center">
+    <div class="card-body">
+        <i class="fas fa-inbox fa-5x text-muted mb-3"></i>
+        <h5 class="card-title">No posts found</h5>
+        <p class="card-text">Try changing your search or filter criteria.</p>
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('new_post') }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Create New Post
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock content %}
