@@ -2,15 +2,13 @@
 {% block content %}
 <div class="jumbotron"
     style="background: linear-gradient(135deg, #c21807 0%, #333 100%); color: white; border-radius: 15px; margin-bottom: 30px; padding: 40px 20px;">
-    <h1 class="display-4 text-center">Waste Walk - Action Plan</h1>
-    <p class="lead text-center">Identify, analyze, and resolve waste-related issues with our systematic approach.</p>
+    <h1 class="display-4 text-center">Action Plan Manager</h1>
+    <p class="lead text-center">Identify, analyze, and resolve issues with our systematic approach.</p>
     <div class="text-center mt-3">
-        <a href="{{ url_for('export_all_posts_pdf') }}" class="btn btn-outline-light mr-2">
-            <i class="fas fa-list"></i> Export Summary PDF
-        </a>
-        <a href="{{ url_for('export_all_posts_detailed_pdf') }}" class="btn btn-light text-danger">
-            <i class="fas fa-file-pdf"></i> Export Detailed PDF
-        </a>
+        <button type="button" class="btn btn-light text-danger btn-lg" data-toggle="modal"
+            data-target="#exportPdfModal">
+            <i class="fas fa-file-pdf"></i> Export to PDF
+        </button>
     </div>
 </div>
 
@@ -65,14 +63,19 @@
                 </div>
                 <div>
                     <h6 class="mb-0">{{ post.author.username }}</h6>
-                    <small class="text-muted"><i class="far fa-calendar-alt"></i> {{
-                        post.date_realization.strftime('%Y-%m-%d') }}</small>
+                    <small class="text-muted">
+                        <i class="far fa-calendar-alt"></i> {{ post.date_realization.strftime('%Y-%m-%d') }}
+                        {% if post.area %} | <i class="fas fa-map-marker-alt"></i> {{ post.area }}{% endif %}
+                    </small>
                 </div>
             </div>
-            <span
-                class="badge badge-{{ 'success' if post.status == 'Completed' else 'warning' if post.status == 'In Progress' else 'danger' }} badge-pill px-3 py-2">
-                <i class="fas fa-circle"></i> {{ post.status }}
-            </span>
+            <div>
+                <span class="badge badge-info mr-1">{{ post.post_type }}</span>
+                <span
+                    class="badge badge-{{ 'success' if post.status == 'Completed' else 'warning' if post.status == 'In Progress' else 'danger' }} badge-pill px-3 py-2">
+                    <i class="fas fa-circle"></i> {{ post.status }}
+                </span>
+            </div>
         </div>
 
         <a href="{{ url_for('post_detail', post_id=post.id) }}"
@@ -103,17 +106,43 @@
 
         <div class="d-flex justify-content-between align-items-center mt-3">
             <div>
-                <i class="fas fa-user-check text-success"></i> <strong>Responsible:</strong> {{ post.responsible }}
+                <i class="fas fa-user-check text-success"></i> <strong>Area Responsible:</strong> {{ post.responsible }}
             </div>
 
-            {% if post.image_file != 'default.jpg' %}
-            <div class="text-center">
-                <a href="{{ url_for('static', filename='uploads/' + post.image_file) }}" target="_blank">
-                    <img src="{{ url_for('static', filename='uploads/' + post.image_file) }}" class="img-thumbnail"
-                        style="max-height: 100px; max-width: 100px; object-fit: cover;" alt="Post image">
-                </a>
+            <!-- Image Previews -->
+            <div class="d-flex">
+                {% if post.image_problem %}
+                <div class="text-center mr-2">
+                    <a href="{{ url_for('static', filename='uploads/' + post.image_problem) }}" target="_blank"
+                        title="Problem/Opportunity Image">
+                        <img src="{{ url_for('static', filename='uploads/' + post.image_problem) }}"
+                            class="img-thumbnail border-warning"
+                            style="max-height: 80px; max-width: 80px; object-fit: cover;" alt="Problem image">
+                    </a>
+                    <div class="small text-muted">Problem</div>
+                </div>
+                {% endif %}
+                {% if post.image_corrective %}
+                <div class="text-center">
+                    <a href="{{ url_for('static', filename='uploads/' + post.image_corrective) }}" target="_blank"
+                        title="Corrective Action Image">
+                        <img src="{{ url_for('static', filename='uploads/' + post.image_corrective) }}"
+                            class="img-thumbnail border-success"
+                            style="max-height: 80px; max-width: 80px; object-fit: cover;" alt="Corrective image">
+                    </a>
+                    <div class="small text-muted">Corrective</div>
+                </div>
+                {% endif %}
+                {% if not post.image_problem and not post.image_corrective and post.image_file and post.image_file !=
+                'default.jpg' %}
+                <div class="text-center">
+                    <a href="{{ url_for('static', filename='uploads/' + post.image_file) }}" target="_blank">
+                        <img src="{{ url_for('static', filename='uploads/' + post.image_file) }}" class="img-thumbnail"
+                            style="max-height: 80px; max-width: 80px; object-fit: cover;" alt="Post image">
+                    </a>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
 
         {% if current_user.role == 'admin' or current_user.id == post.author.id %}
@@ -194,4 +223,7 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Include PDF Export Modal -->
+{% include 'export_modal.html' %}
 {% endblock content %}

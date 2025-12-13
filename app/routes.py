@@ -132,24 +132,38 @@ def new_post():
     form = PostForm()
     if form.validate_on_submit():
         date_realization = datetime.strptime(form.date_realization.data, '%Y-%m-%d').date()
-        if form.image_file.data:
-            picture_file = save_picture(form.image_file.data)
-            post = Post(problem=form.problem.data, cause=form.cause.data, 
-                        corrective_action=form.corrective_action.data, 
-                        responsible=form.responsible.data, 
-                        date_realization=date_realization,
-                        status=form.status.data,
-                        author=current_user, image_file=picture_file)
-        else:
-            post = Post(problem=form.problem.data, cause=form.cause.data, 
-                        corrective_action=form.corrective_action.data, 
-                        responsible=form.responsible.data, 
-                        date_realization=date_realization,
-                        status=form.status.data,
-                        author=current_user)
+        
+        # Parse optional audit_date
+        audit_date = None
+        if form.audit_date.data:
+            audit_date = datetime.strptime(form.audit_date.data, '%Y-%m-%d').date()
+        
+        # Create post with new fields
+        post = Post(
+            post_type=form.post_type.data,
+            problem=form.problem.data,
+            cause=form.cause.data,
+            corrective_action=form.corrective_action.data,
+            responsible=form.responsible.data,
+            area=form.project_area.data or None,
+            date_realization=date_realization,
+            audit_date=audit_date,
+            audit_type=form.audit_type.data or None,
+            status=form.status.data,
+            author=current_user
+        )
+        
+        # Handle problem image
+        if form.image_problem.data and hasattr(form.image_problem.data, 'filename') and form.image_problem.data.filename:
+            post.image_problem = save_picture(form.image_problem.data)
+        
+        # Handle corrective action image
+        if form.image_corrective.data and hasattr(form.image_corrective.data, 'filename') and form.image_corrective.data.filename:
+            post.image_corrective = save_picture(form.image_corrective.data)
+        
         db.session.add(post)
         db.session.commit()
-        log_activity('created', 'post', post.id, f"Created post: {post.problem[:50]}")
+        log_activity('created', 'post', post.id, f"Created {post.post_type} post: {post.problem[:50]}")
         flash('Your post has been created!', 'success')
         return redirect(url_for('home'))
     return render_template('create_post.html', title='New Post', form=form, legend='New Post')
@@ -174,30 +188,49 @@ def edit_post(post_id):
     form = PostForm()
     if form.validate_on_submit():
         date_realization = datetime.strptime(form.date_realization.data, '%Y-%m-%d').date()
+        
+        # Parse optional audit_date
+        audit_date = None
+        if form.audit_date.data:
+            audit_date = datetime.strptime(form.audit_date.data, '%Y-%m-%d').date()
+        
+        # Update all fields
+        post.post_type = form.post_type.data
         post.problem = form.problem.data
         post.cause = form.cause.data
         post.corrective_action = form.corrective_action.data
         post.responsible = form.responsible.data
+        post.area = form.project_area.data or None
         post.date_realization = date_realization
+        post.audit_date = audit_date
+        post.audit_type = form.audit_type.data or None
         post.status = form.status.data
         
-        if form.image_file.data:
-            picture_file = save_picture(form.image_file.data)
-            post.image_file = picture_file
+        # Handle problem image
+        if form.image_problem.data and hasattr(form.image_problem.data, 'filename') and form.image_problem.data.filename:
+            post.image_problem = save_picture(form.image_problem.data)
+        
+        # Handle corrective action image
+        if form.image_corrective.data and hasattr(form.image_corrective.data, 'filename') and form.image_corrective.data.filename:
+            post.image_corrective = save_picture(form.image_corrective.data)
         
         db.session.commit()
-        log_activity('updated', 'post', post.id, f"Updated post: {post.problem[:50]}")
+        log_activity('updated', 'post', post.id, f"Updated {post.post_type} post: {post.problem[:50]}")
         flash('Your post has been updated!', 'success')
         return redirect(url_for('home'))
     elif request.method == 'GET':
+        form.post_type.data = post.post_type
         form.problem.data = post.problem
         form.cause.data = post.cause
         form.corrective_action.data = post.corrective_action
         form.responsible.data = post.responsible
+        form.project_area.data = post.area
         form.date_realization.data = post.date_realization.strftime('%Y-%m-%d')
+        form.audit_date.data = post.audit_date.strftime('%Y-%m-%d') if post.audit_date else ''
+        form.audit_type.data = post.audit_type or ''
         form.status.data = post.status
     
-    return render_template('create_post.html', title='Update Post', form=form, legend='Update Post')
+    return render_template('create_post.html', title='Update Post', form=form, legend='Update Post', post=post)
 
 
 @app.route("/post/<int:post_id>/delete", methods=['POST'])
@@ -840,3 +873,272 @@ def export_all_posts_detailed_pdf():
     response.headers['Content-Disposition'] = f'attachment; filename=waste_walk_detailed_{datetime.now().strftime("%Y%m%d")}.pdf'
     return response
 
+
+# ============================================
+# FILTERED PDF EXPORT ROUTE
+# ============================================
+@app.route("/export-pdf")
+def export_filtered_pdf():
+    """Export posts to PDF with filters applied"""
+    from sqlalchemy import and_
+    
+    # Get filter parameters
+    export_format = request.args.get('export_format', 'summary')
+    post_type = request.args.get('post_type', '')
+    status = request.args.get('status', '')
+    audit_date_from = request.args.get('audit_date_from', '')
+    audit_date_to = request.args.get('audit_date_to', '')
+    responsible = request.args.get('responsible', '')
+    area = request.args.get('area', '')
+    author = request.args.get('author', '')
+    audit_type = request.args.get('audit_type', '')
+    project = request.args.get('project', '')
+    
+    # Build query with filters
+    query = Post.query
+    
+    if post_type:
+        query = query.filter(Post.post_type == post_type)
+    if status:
+        query = query.filter(Post.status == status)
+    if audit_date_from:
+        date_from = datetime.strptime(audit_date_from, '%Y-%m-%d')
+        query = query.filter(Post.audit_date >= date_from)
+    if audit_date_to:
+        date_to = datetime.strptime(audit_date_to, '%Y-%m-%d')
+        query = query.filter(Post.audit_date <= date_to)
+    if responsible:
+        query = query.filter(Post.responsible.ilike(f'%{responsible}%'))
+    if area:
+        query = query.filter(Post.area.ilike(f'%{area}%'))
+    if author:
+        query = query.join(User).filter(User.username.ilike(f'%{author}%'))
+    if audit_type:
+        query = query.filter(Post.audit_type == audit_type)
+    if project:
+        query = query.filter(Post.project.ilike(f'%{project}%'))
+    
+    posts = query.order_by(Post.date_realization.desc()).all()
+    
+    if not posts:
+        flash('No posts found matching your filter criteria.', 'warning')
+        return redirect(url_for('home'))
+    
+    # Generate PDF based on format
+    if export_format == 'detailed':
+        return generate_detailed_pdf(posts, post_type or 'All Types')
+    else:
+        return generate_summary_pdf(posts, post_type or 'All Types')
+
+
+def generate_summary_pdf(posts, title_type):
+    """Generate summary/table format PDF"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=40, bottomMargin=40)
+    
+    styles = getSampleStyleSheet()
+    elements = []
+    
+    # Title
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=20, textColor=colors.HexColor('#c21807'), alignment=1, spaceAfter=20)
+    elements.append(Paragraph(f"{title_type} - Action Plan Summary", title_style))
+    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %H:%M')}", ParagraphStyle('Date', alignment=1, textColor=colors.grey)))
+    elements.append(Spacer(1, 20))
+    
+    # Stats Summary
+    status_counts = {}
+    for post in posts:
+        status_counts[post.status] = status_counts.get(post.status, 0) + 1
+    
+    stats_text = f"Total: {len(posts)} | "
+    stats_text += " | ".join([f"{s}: {c}" for s, c in status_counts.items()])
+    elements.append(Paragraph(stats_text, ParagraphStyle('Stats', alignment=1, fontSize=11, spaceAfter=15)))
+    elements.append(Spacer(1, 10))
+    
+    # Table Data
+    cell_style = ParagraphStyle('Cell', fontSize=8, leading=10)
+    header = ['#', 'Type', 'Problem', 'Responsible', 'Area', 'Target Date', 'Status']
+    data = [header]
+    
+    for i, post in enumerate(posts, 1):
+        row = [
+            str(i),
+            Paragraph(post.post_type or '-', cell_style),
+            Paragraph(post.problem[:40] + '...' if len(post.problem) > 40 else post.problem, cell_style),
+            Paragraph(post.responsible[:15] + '...' if len(post.responsible) > 15 else post.responsible, cell_style),
+            Paragraph(post.area or '-', cell_style),
+            post.date_realization.strftime('%Y-%m-%d'),
+            post.status
+        ]
+        data.append(row)
+    
+    table = Table(data, colWidths=[0.3*inch, 0.8*inch, 2.2*inch, 1.2*inch, 1*inch, 0.9*inch, 0.8*inch])
+    
+    # Status-based row coloring
+    table_style = [
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#c21807')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]
+    
+    for i, post in enumerate(posts, 1):
+        if post.status == 'Completed':
+            table_style.append(('BACKGROUND', (-1, i), (-1, i), colors.HexColor('#d4edda')))
+        elif post.status == 'In Progress':
+            table_style.append(('BACKGROUND', (-1, i), (-1, i), colors.HexColor('#fff3cd')))
+        else:
+            table_style.append(('BACKGROUND', (-1, i), (-1, i), colors.HexColor('#f8d7da')))
+    
+    table.setStyle(TableStyle(table_style))
+    elements.append(table)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=action_plan_summary_{datetime.now().strftime("%Y%m%d")}.pdf'
+    return response
+
+
+def generate_detailed_pdf(posts, title_type):
+    """Generate detailed full-page format PDF"""
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=50, leftMargin=50, topMargin=50, bottomMargin=50)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=22, textColor=colors.white, alignment=1, spaceAfter=5)
+    subtitle_style = ParagraphStyle('Subtitle', parent=styles['Normal'], fontSize=11, textColor=colors.white, alignment=1)
+    heading_style = ParagraphStyle('Heading', parent=styles['Heading2'], fontSize=13, spaceBefore=12, spaceAfter=6, textColor=colors.HexColor('#c21807'))
+    body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=10, spaceAfter=8, leading=14)
+    
+    elements = []
+    
+    for idx, post in enumerate(posts):
+        # Header Banner
+        header_data = [[Paragraph(title_type.upper(), title_style)], [Paragraph("Action Plan Report", subtitle_style)]]
+        header_table = Table(header_data, colWidths=[7*inch])
+        header_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#c21807')),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            ('BOTTOMPADDING', (0, -1), (-1, -1), 12),
+        ]))
+        elements.append(header_table)
+        elements.append(Spacer(1, 15))
+        
+        # Status & Type Badge
+        status_color = colors.HexColor('#28a745') if post.status == 'Completed' else colors.HexColor('#ffc107') if post.status == 'In Progress' else colors.HexColor('#dc3545')
+        badge_data = [[Paragraph(f"<b>{post.status}</b>", ParagraphStyle('Badge', fontSize=11, textColor=colors.white, alignment=1))]]
+        badge_table = Table(badge_data, colWidths=[1.5*inch])
+        badge_table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), status_color), ('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6)]))
+        elements.append(badge_table)
+        elements.append(Spacer(1, 15))
+        
+        # Problem Section
+        elements.append(Paragraph("PROBLEM / OPPORTUNITY", heading_style))
+        problem_data = [[Paragraph(post.problem, body_style)]]
+        problem_table = Table(problem_data, colWidths=[7*inch])
+        problem_table.setStyle(TableStyle([('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#c21807')), ('TOPPADDING', (0, 0), (-1, -1), 10), ('BOTTOMPADDING', (0, 0), (-1, -1), 10), ('LEFTPADDING', (0, 0), (-1, -1), 10)]))
+        elements.append(problem_table)
+        elements.append(Spacer(1, 12))
+        
+        # Details Grid
+        details_data = [
+            [Paragraph("<b>Responsible:</b>", body_style), Paragraph("<b>Area:</b>", body_style), Paragraph("<b>Project:</b>", body_style)],
+            [Paragraph(post.responsible, body_style), Paragraph(post.area or '-', body_style), Paragraph(post.project or '-', body_style)],
+            [Paragraph("<b>Target Date:</b>", body_style), Paragraph("<b>Audit Date:</b>", body_style), Paragraph("<b>Author:</b>", body_style)],
+            [Paragraph(post.date_realization.strftime('%B %d, %Y'), body_style), Paragraph(post.audit_date.strftime('%B %d, %Y') if post.audit_date else '-', body_style), Paragraph(post.author.username, body_style)]
+        ]
+        details_table = Table(details_data, colWidths=[2.3*inch, 2.3*inch, 2.4*inch])
+        details_table.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dee2e6')), ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f8f9fa')), ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#f8f9fa')), ('TOPPADDING', (0, 0), (-1, -1), 6), ('BOTTOMPADDING', (0, 0), (-1, -1), 6), ('LEFTPADDING', (0, 0), (-1, -1), 8)]))
+        elements.append(details_table)
+        elements.append(Spacer(1, 12))
+        
+        # Images Section
+        has_problem_img = post.image_problem
+        has_corrective_img = post.image_corrective
+        
+        if has_problem_img or has_corrective_img:
+            elements.append(Paragraph("IMAGES", heading_style))
+            img_row = []
+            
+            # Problem Image
+            if has_problem_img:
+                try:
+                    img_path = os.path.join(app.root_path, 'static', 'uploads', post.image_problem)
+                    if os.path.exists(img_path):
+                        img = Image(img_path, width=3*inch, height=2.2*inch)
+                        img_cell = [[Paragraph("<b>Problem/Opportunity</b>", ParagraphStyle('ImgLabel', fontSize=9, alignment=1, textColor=colors.HexColor('#856404')))], [img]]
+                        img_table = Table(img_cell, colWidths=[3.2*inch])
+                        img_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#dee2e6')), ('TOPPADDING', (0, 0), (-1, -1), 5), ('BOTTOMPADDING', (0, 0), (-1, -1), 5)]))
+                        img_row.append(img_table)
+                except:
+                    pass
+            
+            # Corrective Action Image
+            if has_corrective_img:
+                try:
+                    img_path = os.path.join(app.root_path, 'static', 'uploads', post.image_corrective)
+                    if os.path.exists(img_path):
+                        img = Image(img_path, width=3*inch, height=2.2*inch)
+                        img_cell = [[Paragraph("<b>Corrective Action</b>", ParagraphStyle('ImgLabel', fontSize=9, alignment=1, textColor=colors.HexColor('#155724')))], [img]]
+                        img_table = Table(img_cell, colWidths=[3.2*inch])
+                        img_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#dee2e6')), ('TOPPADDING', (0, 0), (-1, -1), 5), ('BOTTOMPADDING', (0, 0), (-1, -1), 5)]))
+                        img_row.append(img_table)
+                except:
+                    pass
+            
+            if img_row:
+                images_table = Table([img_row], colWidths=[3.5*inch] * len(img_row))
+                images_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('VALIGN', (0, 0), (-1, -1), 'TOP')]))
+                elements.append(images_table)
+                elements.append(Spacer(1, 12))
+        
+        # Cause & Corrective Action
+        elements.append(Paragraph("ANALYSIS", heading_style))
+        analysis_data = [
+            [Paragraph("<b>Cause</b>", ParagraphStyle('H', fontSize=10, textColor=colors.white)), Paragraph("<b>Corrective Action</b>", ParagraphStyle('H', fontSize=10, textColor=colors.white))],
+            [Paragraph(post.cause, body_style), Paragraph(post.corrective_action, body_style)]
+        ]
+        analysis_table = Table(analysis_data, colWidths=[3.5*inch, 3.5*inch])
+        analysis_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#856404')),
+            ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#155724')),
+            ('BACKGROUND', (0, 1), (-1, 1), colors.white),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#dee2e6')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#dee2e6')),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+        elements.append(analysis_table)
+        
+        # Separator
+        elements.append(Spacer(1, 20))
+        sep_table = Table([['']], colWidths=[7*inch], rowHeights=[3])
+        sep_table.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#c21807'))]))
+        elements.append(sep_table)
+        
+        if idx < len(posts) - 1:
+            elements.append(PageBreak())
+    
+    # Footer
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph(f"Generated: {datetime.now().strftime('%B %d, %Y at %H:%M')} | {len(posts)} posts", ParagraphStyle('Footer', fontSize=9, textColor=colors.grey, alignment=1)))
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    response = make_response(buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=action_plan_detailed_{datetime.now().strftime("%Y%m%d")}.pdf'
+    return response

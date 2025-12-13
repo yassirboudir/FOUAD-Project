@@ -28,17 +28,57 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 class PostForm(FlaskForm):
-    problem = StringField('Problem', validators=[DataRequired()])
+    # Post Type
+    post_type = SelectField('Type', choices=[
+        ('Waste Walk', 'Waste Walk Action Plan'),
+        ('Quality', 'Quality Follow-up Action Plan'),
+        ('Safety & Environmental, Health', 'Safety & Environmental, Health'),
+        ('5S', '5S')
+    ], validators=[DataRequired()])
+    
+    # Problem Details
+    problem = StringField('Problem/Opportunity', validators=[DataRequired()])
     cause = StringField('Cause', validators=[DataRequired()])
     corrective_action = StringField('Corrective Action', validators=[DataRequired()])
-    image_file = FileField('Add Image', validators=[])
-    responsible = StringField('Responsible', validators=[DataRequired()])
-    date_realization = StringField('Date of Realization', validators=[DataRequired()])
-    status = SelectField('Status', choices=[('Open', 'Open'), ('In Progress', 'In Progress'), ('Completed', 'Completed')], validators=[DataRequired()])
+    
+    # Images
+    image_problem = FileField('Problem/Opportunity Image')
+    image_corrective = FileField('Corrective Action Image')
+    
+    # Assignment
+    responsible = StringField('Area Responsible', validators=[DataRequired()])
+    project_area = StringField('Project / Area')
+    
+    # Dates
+    date_realization = StringField('Target Date', validators=[DataRequired()])
+    audit_date = StringField('Audit Date')
+    
+    # Audit Type
+    audit_type = SelectField('Audit Type', choices=[
+        ('', 'Select Audit Type'),
+        ('Internal', 'Internal'),
+        ('External', 'External'),
+        ('Scheduled', 'Scheduled'),
+        ('Random', 'Random'),
+        ('Follow-up', 'Follow-up')
+    ])
+    
+    # Status
+    status = SelectField('Status', choices=[
+        ('Open', 'Open'), 
+        ('In Progress', 'In Progress'), 
+        ('Completed', 'Completed')
+    ], validators=[DataRequired()])
+    
     submit = SubmitField('Post')
     
-    def validate_image_file(self, image_file):
-        if image_file.data:
-            filename = image_file.data.filename
-            if not allowed_file(filename):
-                raise ValidationError('Invalid file type. Please upload an image file (png, jpg, jpeg, gif, bmp, webp).')
+    def validate_image_problem(self, image_problem):
+        if image_problem.data and hasattr(image_problem.data, 'filename') and image_problem.data.filename:
+            if not allowed_file(image_problem.data.filename):
+                raise ValidationError('Invalid file type for problem image.')
+    
+    def validate_image_corrective(self, image_corrective):
+        if image_corrective.data and hasattr(image_corrective.data, 'filename') and image_corrective.data.filename:
+            if not allowed_file(image_corrective.data.filename):
+                raise ValidationError('Invalid file type for corrective action image.')
+
