@@ -1258,3 +1258,23 @@ a.card-title:hover {
   object-fit: contain;
   border-radius: var(--radius-md);
 }
+
+/* Drop Zone Focused State */
+.drop-zone--focused {
+  border-color: var(--primary-red);
+  box-shadow: 0 0 0 3px rgba(194, 24, 7, 0.2);
+  background-color: #fff;
+  border-style: solid;
+}
+
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.drop-zone__input {
+  display: none;
+}

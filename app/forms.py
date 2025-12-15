@@ -38,7 +38,6 @@ class PostForm(FlaskForm):
     
     # Problem Details
     problem = StringField('Problem/Opportunity', validators=[DataRequired()])
-    cause = StringField('Cause', validators=[DataRequired()])
     corrective_action = StringField('Corrective Action', validators=[DataRequired()])
     
     # Images
@@ -62,13 +61,6 @@ class PostForm(FlaskForm):
         ('Random', 'Random'),
         ('Follow-up', 'Follow-up')
     ])
-    
-    # Status
-    status = SelectField('Status', choices=[
-        ('Open', 'Open'), 
-        ('In Progress', 'In Progress'), 
-        ('Completed', 'Completed')
-    ], validators=[DataRequired()])
     
     submit = SubmitField('Post')
     

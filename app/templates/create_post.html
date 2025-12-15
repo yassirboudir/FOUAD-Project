@@ -29,7 +29,7 @@
 
             <hr class="my-4">
 
-            <!-- Problem & Cause Section -->
+            <!-- Problem & Corrective Action Section -->
             <div class="row">
                 <div class="col-md-6">
                     <div class="form-group">
@@ -44,23 +44,17 @@
                     </div>
 
                     <div class="form-group">
-                        {{ form.cause.label(class="form-control-label font-weight-bold") }}
-                        {{ form.cause(class="form-control form-control-lg" + (" is-invalid" if form.cause.errors else
-                        ""), placeholder="Root cause analysis") }}
-                        {% if form.cause.errors %}
-                        <div class="invalid-feedback">
-                            {% for error in form.cause.errors %}<span>{{ error }}</span>{% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="form-group">
                         <label class="form-control-label font-weight-bold"><i class="fas fa-camera text-warning"></i>
                             Problem/Opportunity Image</label>
-                        {{ form.image_problem(class="form-control-file") }}
+                        <div class="drop-zone" id="drop-zone-problem">
+                            <span class="drop-zone__prompt">Click to focus, then Drop or Paste image here</span>
+                            <button type="button" class="btn btn-sm btn-secondary mt-2 drop-zone__btn">Choose
+                                Image</button>
+                            {{ form.image_problem(class="drop-zone__input") }}
+                        </div>
                         {% if form.image_problem.errors %}
                         {% for error in form.image_problem.errors %}
-                        <div class="text-danger">{{ error }}</div>
+                        <div class="text-danger mt-2">{{ error }}</div>
                         {% endfor %}
                         {% endif %}
                         <small class="form-text text-muted">Upload image showing the problem.</small>
@@ -93,36 +87,41 @@
                     <div class="form-group">
                         <label class="form-control-label font-weight-bold"><i class="fas fa-camera text-success"></i>
                             Corrective Action Image</label>
-                        {{ form.image_corrective(class="form-control-file") }}
+                        <div class="drop-zone" id="drop-zone-corrective">
+                            <span class="drop-zone__prompt">Click to focus, then Drop or Paste image here</span>
+                            <button type="button" class="btn btn-sm btn-secondary mt-2 drop-zone__btn">Choose
+                                Image</button>
+                            {{ form.image_corrective(class="drop-zone__input") }}
+                        </div>
                         {% if form.image_corrective.errors %}
                         {% for error in form.image_corrective.errors %}
-                        <div class="text-danger">{{ error }}</div>
+                        <div class="text-danger mt-2">{{ error }}</div>
                         {% endfor %}
                         {% endif %}
-                        <small class="form-text text-muted">Upload image showing the corrective action.</small>
+                        <small class="form-text text-muted">Upload image to complete the action.</small>
                     </div>
                 </div>
             </div>
 
             <hr class="my-4">
 
-            <!-- Dates & Status Section -->
+            <!-- Dates Section -->
             <div class="row">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="form-group">
                         {{ form.audit_date.label(class="form-control-label font-weight-bold") }}
                         {{ form.audit_date(class="form-control form-control-lg", type="date") }}
                         <small class="form-text text-muted">When the audit occurred.</small>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="form-group">
                         {{ form.audit_type.label(class="form-control-label font-weight-bold") }}
                         {{ form.audit_type(class="form-control form-control-lg") }}
                         <small class="form-text text-muted">Type of audit performed.</small>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <div class="form-group">
                         {{ form.date_realization.label(class="form-control-label font-weight-bold") }}
                         {{ form.date_realization(class="form-control form-control-lg", type="date") }}
@@ -134,13 +133,6 @@
                         <small class="form-text text-muted">Target completion date.</small>
                     </div>
                 </div>
-                <div class="col-md-3">
-                    <div class="form-group">
-                        {{ form.status.label(class="form-control-label font-weight-bold") }}
-                        {{ form.status(class="form-control form-control-lg") }}
-                        <small class="form-text text-muted">Current status.</small>
-                    </div>
-                </div>
             </div>
 
             <div class="form-group text-center mt-4">
@@ -150,4 +142,132 @@
         </form>
     </div>
 </div>
+
+<script>
+    document.querySelectorAll(".drop-zone").forEach((dropZoneElement) => {
+        const inputElement = dropZoneElement.querySelector(".drop-zone__input");
+
+        // Click to upload
+        dropZoneElement.addEventListener("click", (e) => {
+            setFocus(dropZoneElement);
+            // inputElement.click(); // Disabled as per user request
+        });
+
+        // Custom button handler
+        const btnElement = dropZoneElement.querySelector(".drop-zone__btn");
+        if (btnElement) {
+            btnElement.addEventListener("click", (e) => {
+                e.stopPropagation(); // Prevent bubbling to drop zone
+                inputElement.click();
+            });
+        }
+
+        inputElement.addEventListener("change", (e) => {
+            if (inputElement.files.length) {
+                updateThumbnail(dropZoneElement, inputElement.files[0]);
+            }
+        });
+
+        // Prevention of default drag behaviors
+        dropZoneElement.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropZoneElement.classList.add("drop-zone--over");
+        });
+
+        ["dragleave", "dragend"].forEach((type) => {
+            dropZoneElement.addEventListener(type, (e) => {
+                dropZoneElement.classList.remove("drop-zone--over");
+            });
+        });
+
+        dropZoneElement.addEventListener("drop", (e) => {
+            e.preventDefault();
+            setFocus(dropZoneElement);
+
+            if (e.dataTransfer.files.length) {
+                inputElement.files = e.dataTransfer.files;
+                updateThumbnail(dropZoneElement, e.dataTransfer.files[0]);
+            }
+
+            dropZoneElement.classList.remove("drop-zone--over");
+        });
+    });
+
+    // Default focus handling
+    let lastClickedDropZone = document.querySelector("#drop-zone-problem");
+
+    // Set initial focus
+    setFocus(lastClickedDropZone);
+
+    function setFocus(zone) {
+        // Remove focus from all
+        document.querySelectorAll(".drop-zone").forEach(z => z.classList.remove("drop-zone--focused"));
+        // Add to current
+        if (zone) {
+            zone.classList.add("drop-zone--focused");
+            lastClickedDropZone = zone;
+        }
+    }
+
+    // Paste functionality
+    window.addEventListener('paste', e => {
+        if (e.clipboardData && e.clipboardData.items) {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") !== -1) {
+                    const file = items[i].getAsFile();
+
+                    if (lastClickedDropZone) {
+                        const inputElement = lastClickedDropZone.querySelector(".drop-zone__input");
+
+                        // Create a DataTransfer to set files property
+                        const dataTransfer = new DataTransfer();
+                        dataTransfer.items.add(file);
+                        inputElement.files = dataTransfer.files;
+
+                        updateThumbnail(lastClickedDropZone, file);
+                        e.preventDefault(); // Prevent pasting into other elements if any
+                    }
+                    break;
+                }
+            }
+        }
+    });
+
+    /**
+     * Updates the thumbnail on a drop zone element.
+     *
+     * @param {HTMLElement} dropZoneElement
+     * @param {File} file
+     */
+    function updateThumbnail(dropZoneElement, file) {
+        let thumbnailElement = dropZoneElement.querySelector(".drop-zone__thumb");
+
+        // First time - remove the prompt
+        if (dropZoneElement.querySelector(".drop-zone__prompt")) {
+            dropZoneElement.querySelector(".drop-zone__prompt").style.display = "none";
+        }
+
+        // First time - there is no thumbnail element, so lets create it
+        if (!thumbnailElement) {
+            thumbnailElement = document.createElement("div");
+            thumbnailElement.classList.add("drop-zone__thumb");
+            dropZoneElement.appendChild(thumbnailElement);
+        }
+
+        thumbnailElement.dataset.label = file.name;
+
+        // Show thumbnail for image files
+        if (file.type.startsWith("image/")) {
+            const reader = new FileReader();
+
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                thumbnailElement.style.backgroundImage = `url('${reader.result}')`;
+            };
+        } else {
+            thumbnailElement.style.backgroundImage = null;
+        }
+    }
+</script>
 {% endblock content %}

@@ -138,18 +138,18 @@ def new_post():
         if form.audit_date.data:
             audit_date = datetime.strptime(form.audit_date.data, '%Y-%m-%d').date()
         
-        # Create post with new fields
+        # Create post with new fields - status is 'Open' by default
         post = Post(
             post_type=form.post_type.data,
             problem=form.problem.data,
-            cause=form.cause.data,
+            cause='',  # No longer required in form
             corrective_action=form.corrective_action.data,
             responsible=form.responsible.data,
             area=form.project_area.data or None,
             date_realization=date_realization,
             audit_date=audit_date,
             audit_type=form.audit_type.data or None,
-            status=form.status.data,
+            status='Open',  # Always starts as Open
             author=current_user
         )
         
@@ -197,14 +197,13 @@ def edit_post(post_id):
         # Update all fields
         post.post_type = form.post_type.data
         post.problem = form.problem.data
-        post.cause = form.cause.data
         post.corrective_action = form.corrective_action.data
         post.responsible = form.responsible.data
         post.area = form.project_area.data or None
         post.date_realization = date_realization
         post.audit_date = audit_date
         post.audit_type = form.audit_type.data or None
-        post.status = form.status.data
+        # Don't update status here - it's managed through complete_post
         
         # Handle problem image
         if form.image_problem.data and hasattr(form.image_problem.data, 'filename') and form.image_problem.data.filename:
@@ -221,14 +220,12 @@ def edit_post(post_id):
     elif request.method == 'GET':
         form.post_type.data = post.post_type
         form.problem.data = post.problem
-        form.cause.data = post.cause
         form.corrective_action.data = post.corrective_action
         form.responsible.data = post.responsible
         form.project_area.data = post.area
         form.date_realization.data = post.date_realization.strftime('%Y-%m-%d')
         form.audit_date.data = post.audit_date.strftime('%Y-%m-%d') if post.audit_date else ''
         form.audit_type.data = post.audit_type or ''
-        form.status.data = post.status
     
     return render_template('create_post.html', title='Update Post', form=form, legend='Update Post', post=post)
 
@@ -249,6 +246,47 @@ def delete_post(post_id):
     db.session.commit()
     flash('Your post has been deleted!', 'success')
     return redirect(url_for('home'))
+
+
+@app.route("/post/<int:post_id>/complete", methods=['POST'])
+@login_required
+@roles_required('admin', 'publisher')
+def complete_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    
+    # Check if the current user is the author of the post or an admin
+    if post.author != current_user and current_user.role != 'admin':
+        abort(403)
+    
+    # Check if corrective action image exists
+    if not post.image_corrective:
+        flash('Cannot complete post without uploading a corrective action image. Please edit the post and upload an image.', 'warning')
+        return redirect(url_for('post_detail', post_id=post_id))
+    
+    # Mark as completed
+    post.status = 'Completed'
+    db.session.commit()
+    log_activity('completed', 'post', post.id, f"Completed post: {post.problem[:50]}")
+    flash('Post has been marked as Completed!', 'success')
+    return redirect(url_for('post_detail', post_id=post_id))
+
+
+@app.route("/post/<int:post_id>/reopen", methods=['POST'])
+@login_required
+@roles_required('admin', 'publisher')
+def reopen_post(post_id):
+    post = Post.query.get_or_404(post_id)
+    
+    # Check if the current user is the author of the post or an admin
+    if post.author != current_user and current_user.role != 'admin':
+        abort(403)
+    
+    # Reopen the post
+    post.status = 'Open'
+    db.session.commit()
+    log_activity('reopened', 'post', post.id, f"Reopened post: {post.problem[:50]}")
+    flash('Post has been reopened.', 'info')
+    return redirect(url_for('post_detail', post_id=post_id))
 
 
 @app.route("/user/<string:username>")
